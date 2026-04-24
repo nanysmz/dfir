@@ -1,0 +1,108 @@
+name: dfir
+
+services:
+  lint:
+    image: dfir-app:local
+    command: sh -c "black --check src tests manage.py && flake8 src tests manage.py"
+    working_dir: /app
+    volumes:
+      - .:/app
+    profiles:
+      - tools
+
+  test:
+    image: dfir-app:local
+    command: pytest
+    working_dir: /app
+    volumes:
+      - .:/app
+    environment:
+      DJANGO_SETTINGS_MODULE: dfir_app.settings
+      CELERY_TASK_ALWAYS_EAGER: "true"
+    profiles:
+      - tools
+
+  web:
+    build:
+      context: .
+      args:
+        INSTALL_DEV: "true"
+    image: dfir-app:local
+    command: web
+    environment:
+      DJANGO_SETTINGS_MODULE: dfir_app.settings
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      EVIDENCE_INPUT_PATH: /evidence/input
+      EVIDENCE_OUTPUT_PATH: /evidence/output
+      DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
+      DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@example.local}
+      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-admin}
+    ports:
+      - "${DFIR_WEB_PORT:-8000}:8000"
+    volumes:
+      - type: bind
+        source: ${EVIDENCE_INPUT_HOST_PATH:-./.local/evidence/input}
+        target: /evidence/input
+        read_only: true
+      - type: bind
+        source: ${EVIDENCE_OUTPUT_HOST_PATH:-./.local/evidence/output}
+        target: /evidence/output
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    image: dfir-app:local
+    command: celery -A dfir_app worker --loglevel=INFO
+    environment:
+      DJANGO_SETTINGS_MODULE: dfir_app.settings
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      EVIDENCE_INPUT_PATH: /evidence/input
+      EVIDENCE_OUTPUT_PATH: /evidence/output
+    volumes:
+      - type: bind
+        source: ${EVIDENCE_INPUT_HOST_PATH:-./.local/evidence/input}
+        target: /evidence/input
+        read_only: true
+      - type: bind
+        source: ${EVIDENCE_OUTPUT_HOST_PATH:-./.local/evidence/output}
+        target: /evidence/output
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:8.6.2-alpine
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  postgres:
+    image: postgres:18.3-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dfir}
+      POSTGRES_USER: ${POSTGRES_USER:-dfir}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dfir}
+    volumes:
+      - postgres-data-18:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres-data-18:

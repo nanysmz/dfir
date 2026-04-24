@@ -1,0 +1,1 @@
+"""Core DFIR Django application."""

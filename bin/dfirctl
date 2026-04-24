@@ -1,0 +1,232 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DETACH="true"
+BUILD_MODE="auto"
+INPUT_PATH=""
+OUTPUT_PATH=""
+
+usage() {
+  cat <<'EOF'
+Usage: bin/dfirctl [options]
+
+Interactive Docker launcher for the DFIR runtime.
+
+Options:
+  --input PATH       Host evidence input directory mounted read-only.
+  --output PATH      Host evidence output directory mounted writable.
+  --build            Force docker compose build web before starting.
+  --foreground       Run Docker Compose in the foreground.
+  --no-build         Never build; fail if the image is missing.
+  --status           Show Docker Compose service status.
+  --down             Stop the runtime without deleting volumes.
+  -h, --help         Show this help.
+
+If --input or --output is omitted, the CLI tries a visual folder picker first
+and falls back to a text prompt.
+EOF
+}
+
+absolute_path() {
+  local path="$1"
+  if [[ "$path" == /* ]]; then
+    printf '%s\n' "$path"
+  else
+    printf '%s\n' "$(cd "$(dirname "$path")" && pwd)/$(basename "$path")"
+  fi
+}
+
+export_runtime_env() {
+  local input="$1"
+  local output="$2"
+
+  export CELERY_BROKER_URL="${CELERY_BROKER_URL:-redis://redis:6379/0}"
+  export CELERY_RESULT_BACKEND="${CELERY_RESULT_BACKEND:-redis://redis:6379/0}"
+  export DFIR_WEB_PORT="${DFIR_WEB_PORT:-8000}"
+  export DJANGO_ALLOWED_HOSTS="${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}"
+  export DJANGO_DEBUG="${DJANGO_DEBUG:-true}"
+  export DJANGO_SECRET_KEY="${DJANGO_SECRET_KEY:-local-dev-insecure-change-me}"
+  export DJANGO_SUPERUSER_EMAIL="${DJANGO_SUPERUSER_EMAIL:-admin@example.local}"
+  export DJANGO_SUPERUSER_PASSWORD="${DJANGO_SUPERUSER_PASSWORD:-admin}"
+  export DJANGO_SUPERUSER_USERNAME="${DJANGO_SUPERUSER_USERNAME:-admin}"
+  export EVIDENCE_INPUT_HOST_PATH="$input"
+  export EVIDENCE_OUTPUT_HOST_PATH="$output"
+  export POSTGRES_DB="${POSTGRES_DB:-dfir}"
+  export POSTGRES_HOST="${POSTGRES_HOST:-postgres}"
+  export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-dfir}"
+  export POSTGRES_PORT="${POSTGRES_PORT:-5432}"
+  export POSTGRES_USER="${POSTGRES_USER:-dfir}"
+}
+
+require_docker() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "Error: Docker was not found on PATH." >&2
+    exit 1
+  fi
+}
+
+image_exists() {
+  docker image inspect dfir-app:local >/dev/null 2>&1
+}
+
+prompt_path() {
+  local label="$1"
+  local value=""
+  while [[ -z "$value" ]]; do
+    read -r -p "$label: " value
+  done
+  printf '%s\n' "$value"
+}
+
+pick_path_macos() {
+  local label="$1"
+  osascript <<EOF
+set chosenFolder to choose folder with prompt "$label"
+POSIX path of chosenFolder
+EOF
+}
+
+pick_path_linux() {
+  local label="$1"
+
+  if command -v zenity >/dev/null 2>&1; then
+    zenity --file-selection --directory --title="$label"
+    return
+  fi
+
+  if command -v qarma >/dev/null 2>&1; then
+    qarma --file-selection --directory --title="$label"
+    return
+  fi
+
+  if command -v kdialog >/dev/null 2>&1; then
+    kdialog --getexistingdirectory "$HOME" "$label"
+    return
+  fi
+
+  return 1
+}
+
+choose_path() {
+  local label="$1"
+  local selected=""
+
+  case "$(uname -s)" in
+    Darwin)
+      if command -v osascript >/dev/null 2>&1; then
+        selected="$(pick_path_macos "$label" 2>/dev/null || true)"
+      fi
+      ;;
+    Linux)
+      selected="$(pick_path_linux "$label" 2>/dev/null || true)"
+      ;;
+  esac
+
+  if [[ -z "$selected" ]]; then
+    selected="$(prompt_path "$label")"
+  fi
+
+  printf '%s\n' "$selected"
+}
+
+validate_dir() {
+  local label="$1"
+  local path="$2"
+  if [[ ! -d "$path" ]]; then
+    echo "Error: $label directory does not exist: $path" >&2
+    exit 1
+  fi
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --input)
+      INPUT_PATH="${2:-}"
+      shift 2
+      ;;
+    --output)
+      OUTPUT_PATH="${2:-}"
+      shift 2
+      ;;
+    --foreground)
+      DETACH="false"
+      shift
+      ;;
+    --build)
+      BUILD_MODE="always"
+      shift
+      ;;
+    --no-build)
+      BUILD_MODE="never"
+      shift
+      ;;
+    --status)
+      require_docker
+      cd "$ROOT_DIR"
+      docker compose ps
+      exit 0
+      ;;
+    --down)
+      require_docker
+      cd "$ROOT_DIR"
+      docker compose down
+      exit 0
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+require_docker
+
+if [[ -z "$INPUT_PATH" ]]; then
+  INPUT_PATH="$(choose_path "Select the evidence input directory (read-only mount)")"
+fi
+
+if [[ -z "$OUTPUT_PATH" ]]; then
+  OUTPUT_PATH="$(choose_path "Select the evidence output directory (writable mount)")"
+fi
+
+INPUT_PATH="$(absolute_path "$INPUT_PATH")"
+OUTPUT_PATH="$(absolute_path "$OUTPUT_PATH")"
+
+validate_dir "Evidence input" "$INPUT_PATH"
+validate_dir "Evidence output" "$OUTPUT_PATH"
+
+export_runtime_env "$INPUT_PATH" "$OUTPUT_PATH"
+
+echo "Runtime configuration loaded from shell environment."
+echo "Input  -> $INPUT_PATH mounted at /evidence/input read-only"
+echo "Output -> $OUTPUT_PATH mounted at /evidence/output writable"
+
+cd "$ROOT_DIR"
+
+if [[ "$BUILD_MODE" == "always" ]]; then
+  docker compose build web
+elif [[ "$BUILD_MODE" == "auto" ]]; then
+  if image_exists; then
+    echo "Using existing image dfir-app:local. Pass --build to rebuild."
+  else
+    echo "Image dfir-app:local not found; building it once."
+    docker compose build web
+  fi
+elif ! image_exists; then
+  echo "Error: dfir-app:local image not found. Run bin/dfirctl --build first." >&2
+  exit 1
+fi
+
+if [[ "$DETACH" == "true" ]]; then
+  docker compose up --detach
+  docker compose ps
+  echo "Open http://localhost:8000/health/"
+else
+  docker compose up
+fi

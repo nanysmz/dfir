@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=80.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dfir"
+version = "0.1.0"
+description = "Dockerized DFIR evidence analysis skeleton with Django, Celery, Redis, Postgres, and a cross-platform launcher CLI."
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "Django==6.0.4",
+    "celery==5.6.3",
+    "psycopg[binary]==3.3.3",
+    "redis==7.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black==26.3.1",
+    "flake8==7.3.0",
+    "pytest==9.0.3",
+    "pytest-django==4.11.1",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py314"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "dfir_app.settings"
+pythonpath = ["src"]
+testpaths = ["tests"]
