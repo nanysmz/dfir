@@ -6,6 +6,7 @@ DETACH="true"
 BUILD_MODE="auto"
 INPUT_PATH=""
 OUTPUT_PATH=""
+RESTART="false"
 
 usage() {
   cat <<'EOF'
@@ -20,7 +21,8 @@ Options:
   --foreground       Run Docker Compose in the foreground.
   --no-build         Never build; fail if the image is missing.
   --status           Show Docker Compose service status.
-  --down             Stop the runtime without deleting volumes.
+  --down, --stop     Stop the runtime without deleting volumes.
+  --restart          Stop the runtime and start it again with the same arguments.
   -h, --help         Show this help.
 
 If --input or --output is omitted, the CLI tries a visual folder picker first
@@ -130,13 +132,18 @@ choose_path() {
   printf '%s\n' "$selected"
 }
 
-validate_dir() {
+validate_input_dir() {
   local label="$1"
   local path="$2"
   if [[ ! -d "$path" ]]; then
     echo "Error: $label directory does not exist: $path" >&2
     exit 1
   fi
+}
+
+ensure_output_dir() {
+  local path="$1"
+  mkdir -p "$path"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -167,11 +174,15 @@ while [[ $# -gt 0 ]]; do
       docker compose ps
       exit 0
       ;;
-    --down)
+    --down|--stop)
       require_docker
       cd "$ROOT_DIR"
       docker compose down
       exit 0
+      ;;
+    --restart)
+      RESTART="true"
+      shift
       ;;
     -h|--help)
       usage
@@ -198,8 +209,9 @@ fi
 INPUT_PATH="$(absolute_path "$INPUT_PATH")"
 OUTPUT_PATH="$(absolute_path "$OUTPUT_PATH")"
 
-validate_dir "Evidence input" "$INPUT_PATH"
-validate_dir "Evidence output" "$OUTPUT_PATH"
+validate_input_dir "Evidence input" "$INPUT_PATH"
+ensure_output_dir "$OUTPUT_PATH"
+validate_input_dir "Evidence output" "$OUTPUT_PATH"
 
 export_runtime_env "$INPUT_PATH" "$OUTPUT_PATH"
 
@@ -208,6 +220,10 @@ echo "Input  -> $INPUT_PATH mounted at /evidence/input read-only"
 echo "Output -> $OUTPUT_PATH mounted at /evidence/output writable"
 
 cd "$ROOT_DIR"
+
+if [[ "$RESTART" == "true" ]]; then
+  docker compose down
+fi
 
 if [[ "$BUILD_MODE" == "always" ]]; then
   docker compose build web

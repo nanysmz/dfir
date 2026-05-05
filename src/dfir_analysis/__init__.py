@@ -1,0 +1,1 @@
+"""Analisis domain app."""

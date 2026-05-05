@@ -5,7 +5,9 @@ param(
     [switch]$Foreground,
     [switch]$NoBuild,
     [switch]$Status,
-    [switch]$Down
+    [switch]$Down,
+    [switch]$Stop,
+    [switch]$Restart
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,6 +30,12 @@ function Resolve-ExistingDirectory([string]$Label, [string]$PathValue) {
         Write-Error "$Label directory does not exist: $PathValue"
     }
     return (Resolve-Path -LiteralPath $PathValue).Path
+}
+
+function Ensure-Directory([string]$PathValue) {
+    if (-not (Test-Path -LiteralPath $PathValue)) {
+        New-Item -ItemType Directory -Path $PathValue -Force | Out-Null
+    }
 }
 
 function Select-Folder([string]$Description) {
@@ -75,7 +83,7 @@ if ($Status) {
     exit $LASTEXITCODE
 }
 
-if ($Down) {
+if ($Down -or $Stop) {
     docker compose down
     exit $LASTEXITCODE
 }
@@ -97,6 +105,7 @@ if (-not $OutputPath) {
 }
 
 $InputPath = Resolve-ExistingDirectory "Evidence input" $InputPath
+Ensure-Directory $OutputPath
 $OutputPath = Resolve-ExistingDirectory "Evidence output" $OutputPath
 
 Set-RuntimeEnv $InputPath $OutputPath
@@ -104,6 +113,11 @@ Set-RuntimeEnv $InputPath $OutputPath
 Write-Host "Runtime configuration loaded from process environment."
 Write-Host "Input  -> $InputPath mounted at /evidence/input read-only"
 Write-Host "Output -> $OutputPath mounted at /evidence/output writable"
+
+if ($Restart) {
+    docker compose down
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
 
 if ($Build) {
     docker compose build web

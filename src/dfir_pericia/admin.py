@@ -27,6 +27,27 @@ class PericiaExecutionAdmin(admin.ModelAdmin):
         "started_at",
     )
     list_filter = ("status", "pericia_point__point_family")
+    readonly_fields = (
+        "pericia_point",
+        "analysis_plan",
+        "device_analysis_result",
+        "status",
+        "scope_snapshot",
+        "engine_metadata",
+        "analyzed_files_count",
+        "unsupported_files_count",
+        "failed_files_count",
+        "matched_files_count",
+        "findings_count",
+        "unsupported_files",
+        "failed_files",
+        "started_at",
+        "finished_at",
+    )
+    fields = readonly_fields
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(PericiaFinding)

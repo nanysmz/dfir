@@ -5,7 +5,23 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+
+def resolve_base_dir() -> Path:
+    candidates = [
+        Path.cwd(),
+        Path("/app"),
+        Path(__file__).resolve().parents[2],
+    ]
+    for candidate in candidates:
+        if (candidate / "manage.py").exists():
+            return candidate
+    for candidate in candidates:
+        if (candidate / "templates").exists() and (candidate / "src").exists():
+            return candidate
+    return Path(__file__).resolve().parents[2]
+
+
+BASE_DIR = resolve_base_dir()
 
 
 def env(name: str, default: str | None = None) -> str:
@@ -31,12 +47,17 @@ ALLOWED_HOSTS = [
 ]
 
 INSTALLED_APPS = [
+    "unfold",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "dfir_cases",
+    "dfir_evidence",
+    "dfir_analysis",
+    "dfir_reports",
     "dfir_core",
     "dfir_pericia",
 ]
@@ -56,7 +77,7 @@ ROOT_URLCONF = "dfir_app.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -81,8 +102,8 @@ DATABASES = {
     }
 }
 
-LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
+LANGUAGE_CODE = "es-ar"
+TIME_ZONE = "America/Argentina/Buenos_Aires"
 USE_I18N = True
 USE_TZ = True
 
@@ -95,3 +116,55 @@ EVIDENCE_OUTPUT_PATH = Path(env("EVIDENCE_OUTPUT_PATH", "/evidence/output"))
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", "redis://redis:6379/0")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
 CELERY_TASK_ALWAYS_EAGER = env_bool("CELERY_TASK_ALWAYS_EAGER", False)
+DATA_UPLOAD_MAX_NUMBER_FIELDS = int(env("DJANGO_DATA_UPLOAD_MAX_NUMBER_FIELDS", "5000"))
+
+UNFOLD = {
+    "SITE_TITLE": "DFIR",
+    "SITE_HEADER": "DFIR",
+    "SITE_SUBHEADER": "Backoffice pericial",
+    "SITE_SYMBOL": "search_insights",
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": False,
+    "DASHBOARD_CALLBACK": "dfir_core.admin.dashboard_callback",
+    "SIDEBAR": {
+        "show_search": False,
+        "show_all_applications": False,
+        "navigation": [
+            {
+                "title": "Flujo pericial",
+                "separator": True,
+                "items": [
+                    {"title": "Inicio", "icon": "space_dashboard", "link": "/admin/"},
+                    {
+                        "title": "Casos periciales",
+                        "icon": "folder_managed",
+                        "link": "/admin/dfir_cases/periciacaseproxy/",
+                    },
+                    {
+                        "title": "Evidencia",
+                        "icon": "inventory_2",
+                        "link": "/admin/dfir_evidence/evidenceitemproxy/",
+                    },
+                    {
+                        "title": "Analisis",
+                        "icon": "manage_search",
+                        "link": "/admin/dfir_analysis/analysisplanproxy/",
+                    },
+                    {
+                        "title": "Informe",
+                        "icon": "description",
+                        "link": "/admin/dfir_reports/reportsectionproxy/",
+                    },
+                ],
+            },
+            {
+                "title": "Administracion del sistema",
+                "separator": True,
+                "items": [
+                    {"title": "Usuarios", "icon": "people", "link": "/admin/auth/user/"},
+                    {"title": "Grupos", "icon": "group_work", "link": "/admin/auth/group/"},
+                ],
+            },
+        ]
+    },
+}

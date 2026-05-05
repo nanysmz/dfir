@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, UTC
 from html.parser import HTMLParser
 from pathlib import Path
+
+from PyPDF2 import PdfReader
+from docx import Document
+from PIL import Image
 
 from .models import EvidenceFile
 
@@ -89,6 +94,26 @@ OFFICE_SUFFIXES = {".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt"}
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tif", ".tiff"}
 
 
+def collect_path_metadata(path: Path) -> dict:
+    stat = path.stat()
+    metadata = {
+        "source_name": path.name,
+        "parent_directory": path.parent.name,
+        "suffix": path.suffix.lower(),
+        "is_directory": path.is_dir(),
+        "size_bytes": stat.st_size if path.is_file() else None,
+        "filesystem_dates": {
+            "accessed_at": _to_iso(stat.st_atime),
+            "modified_at": _to_iso(stat.st_mtime),
+            "metadata_changed_at": _to_iso(stat.st_ctime),
+        },
+    }
+    birthtime = getattr(stat, "st_birthtime", None)
+    if birthtime is not None:
+        metadata["filesystem_dates"]["created_at"] = _to_iso(birthtime)
+    return metadata
+
+
 def infer_file_kind(path: Path) -> str:
     suffix = path.suffix.lower()
     if suffix in TEXT_SUFFIXES:
@@ -108,15 +133,21 @@ def infer_file_kind(path: Path) -> str:
     return EvidenceFile.FileKind.UNKNOWN
 
 
-def ensure_evidence_file(path: str | Path) -> EvidenceFile:
+def ensure_evidence_file(
+    path: str | Path,
+    *,
+    identity_scope: str = EvidenceFile.IDENTITY_SCOPE_GLOBAL,
+) -> EvidenceFile:
     path = Path(path)
     stat = path.stat()
     defaults = {
         "display_name": path.name,
         "file_kind": infer_file_kind(path),
         "size_bytes": stat.st_size,
+        "metadata": collect_path_metadata(path),
     }
     evidence_file, _ = EvidenceFile.objects.update_or_create(
+        identity_scope=identity_scope,
         source_path=str(path),
         defaults=defaults,
     )
@@ -126,7 +157,11 @@ def ensure_evidence_file(path: str | Path) -> EvidenceFile:
 def extract_evidence_content(evidence_file: EvidenceFile) -> ExtractionResult:
     path = Path(evidence_file.source_path)
     file_kind = evidence_file.file_kind
-    base_metadata = {"source_path": evidence_file.source_path, "file_kind": file_kind}
+    base_metadata = {
+        "source_path": evidence_file.source_path,
+        "file_kind": file_kind,
+        "evidence_metadata": evidence_file.metadata or {},
+    }
 
     if not path.exists():
         return ExtractionResult.failed(
@@ -144,6 +179,10 @@ def extract_evidence_content(evidence_file: EvidenceFile) -> ExtractionResult:
         EvidenceFile.FileKind.DOC,
         EvidenceFile.FileKind.DOCX,
     }:
+        if file_kind == EvidenceFile.FileKind.PDF:
+            return _extract_pdf(path, base_metadata)
+        if file_kind == EvidenceFile.FileKind.DOCX:
+            return _extract_docx(path, base_metadata)
         return ExtractionResult.unsupported(
             content_type=file_kind,
             reason="Extractor adapter not implemented yet for this document format.",
@@ -175,6 +214,7 @@ def _extract_text(path: Path, metadata: dict) -> ExtractionResult:
             metadata={
                 "line_count": len(text.splitlines()),
                 "character_count": len(text),
+                **collect_path_metadata(path),
             },
         ),
         metadata=metadata,
@@ -201,6 +241,63 @@ def _extract_html(path: Path, metadata: dict) -> ExtractionResult:
             metadata={
                 "source_format": "html",
                 "character_count": len(text),
+                **collect_path_metadata(path),
+            },
+        ),
+        metadata=metadata,
+    )
+
+
+def _extract_pdf(path: Path, metadata: dict) -> ExtractionResult:
+    try:
+        reader = PdfReader(str(path))
+        pages: list[str] = []
+        for page in reader.pages:
+            pages.append(page.extract_text() or "")
+        text = "\n".join(part for part in pages if part)
+    except Exception as exc:
+        return ExtractionResult.unsupported(
+            content_type="pdf",
+            reason=str(exc),
+            metadata=metadata,
+        )
+
+    return ExtractionResult.supported(
+        content_type="text",
+        content=NormalizedTextContent(
+            text=text,
+            metadata={
+                "source_format": "pdf",
+                "page_count": len(reader.pages),
+                "character_count": len(text),
+                **collect_path_metadata(path),
+            },
+        ),
+        metadata=metadata,
+    )
+
+
+def _extract_docx(path: Path, metadata: dict) -> ExtractionResult:
+    try:
+        document = Document(str(path))
+        paragraphs = [paragraph.text for paragraph in document.paragraphs if paragraph.text]
+        text = "\n".join(paragraphs)
+    except Exception as exc:
+        return ExtractionResult.failed(
+            content_type="docx",
+            reason=str(exc),
+            metadata=metadata,
+        )
+
+    return ExtractionResult.supported(
+        content_type="text",
+        content=NormalizedTextContent(
+            text=text,
+            metadata={
+                "source_format": "docx",
+                "paragraph_count": len(paragraphs),
+                "character_count": len(text),
+                **collect_path_metadata(path),
             },
         ),
         metadata=metadata,
@@ -209,17 +306,44 @@ def _extract_html(path: Path, metadata: dict) -> ExtractionResult:
 
 def _extract_image(evidence_file: EvidenceFile, metadata: dict) -> ExtractionResult:
     image_metadata = evidence_file.metadata or {}
+    path = Path(evidence_file.source_path)
+    textual_parts: list[str] = []
+
+    try:
+        with Image.open(path) as image:
+            for value in image.info.values():
+                if isinstance(value, str) and value.strip():
+                    textual_parts.append(value.strip())
+            exif = image.getexif()
+            for value in exif.values():
+                if isinstance(value, str) and value.strip():
+                    textual_parts.append(value.strip())
+    except Exception:
+        pass
+
+    textual_parts.extend(
+        str(image_metadata.get(key, "")).strip()
+        for key in ("ocr_text", "description", "comment")
+        if str(image_metadata.get(key, "")).strip()
+    )
+    combined_text = "\n".join(dict.fromkeys(textual_parts))
+
     return ExtractionResult.supported(
         content_type="image",
         content=NormalizedImageContent(
             labels=image_metadata.get("image_labels", []),
             detections=image_metadata.get("image_detections", []),
-            ocr_text=image_metadata.get("ocr_text", ""),
+            ocr_text=combined_text,
             metadata={
                 "source_format": evidence_file.file_kind,
                 "analysis_ready": True,
                 "placeholder_engine": True,
+                **collect_path_metadata(path),
             },
         ),
         metadata=metadata,
     )
+
+
+def _to_iso(timestamp: float) -> str:
+    return datetime.fromtimestamp(timestamp, tz=UTC).isoformat()

@@ -13,6 +13,7 @@ RUN apt-get update \
 
 COPY pyproject.toml README.md ./
 COPY src ./src
+COPY templates ./templates
 COPY manage.py ./
 COPY docker ./docker
 

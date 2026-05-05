@@ -29,6 +29,7 @@ services:
         INSTALL_DEV: "true"
     image: dfir-app:local
     command: web
+    working_dir: /app
     environment:
       DJANGO_SETTINGS_MODULE: dfir_app.settings
       POSTGRES_HOST: postgres
@@ -43,6 +44,7 @@ services:
     ports:
       - "${DFIR_WEB_PORT:-8000}:8000"
     volumes:
+      - .:/app
       - type: bind
         source: ${EVIDENCE_INPUT_HOST_PATH:-./.local/evidence/input}
         target: /evidence/input
@@ -59,6 +61,7 @@ services:
   worker:
     image: dfir-app:local
     command: celery -A dfir_app worker --loglevel=INFO
+    working_dir: /app
     environment:
       DJANGO_SETTINGS_MODULE: dfir_app.settings
       POSTGRES_HOST: postgres
@@ -68,6 +71,7 @@ services:
       EVIDENCE_INPUT_PATH: /evidence/input
       EVIDENCE_OUTPUT_PATH: /evidence/output
     volumes:
+      - .:/app
       - type: bind
         source: ${EVIDENCE_INPUT_HOST_PATH:-./.local/evidence/input}
         target: /evidence/input

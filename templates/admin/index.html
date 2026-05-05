@@ -1,0 +1,181 @@
+{% extends "admin/base_site.html" %}
+
+{% load i18n unfold %}
+
+{% block content %}
+{% trans "Flujo pericial" as workflow_title %}
+{% trans "Ruta guiada" as guided_title %}
+{% trans "Dependencias del flujo" as dependency_title %}
+{% trans "Retomar pericias" as resume_title %}
+{% trans "Empezar una pericia" as start_title %}
+{% trans "Siguiente paso recomendado" as next_step_title %}
+
+{% component "unfold/components/container.html" %}
+  <div class="flex flex-col gap-6">
+    {% component "unfold/components/card.html" with class="overflow-hidden" %}
+      <div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.9fr)] xl:items-end">
+        <div class="flex max-w-3xl flex-col gap-3">
+          {% component "unfold/components/text.html" with class="text-xs font-medium uppercase tracking-wide text-base-500" %}
+            {% trans "Flujo pericial" %}
+          {% endcomponent %}
+          {% component "unfold/components/title.html" with class="text-3xl leading-tight lg:text-4xl" %}
+            {% trans "Backoffice operativo para gestionar pericias informaticas" %}
+          {% endcomponent %}
+          {% component "unfold/components/text.html" with class="max-w-2xl text-sm text-base-600 dark:text-base-300" %}
+            {% trans "Empeza por el caso, registra la evidencia montada en Docker, crea los planes de analisis y consolida el informe final sin salir del admin." %}
+          {% endcomponent %}
+        </div>
+
+        <div class="rounded-default border border-primary-200 bg-primary-50/80 p-4 dark:border-primary-900 dark:bg-primary-950/30">
+          <div class="flex flex-col gap-2">
+            {% component "unfold/components/text.html" with class="text-xs font-medium uppercase tracking-wide text-primary-700 dark:text-primary-300" %}
+              {{ next_step_title }}
+            {% endcomponent %}
+            {% with featured_card=workflow_stage_cards|first %}
+              {% for card in workflow_stage_cards %}
+                {% if card.is_featured %}
+                  {% component "unfold/components/title.html" with class="text-xl leading-tight" %}
+                    {{ card.step }} · {{ card.title }}
+                  {% endcomponent %}
+                  {% component "unfold/components/text.html" with class="text-sm text-base-700 dark:text-base-200" %}
+                    {{ card.helper }}
+                  {% endcomponent %}
+                  <div class="pt-2">
+                    {% component "unfold/components/button.html" with href=card.link variant=card.cta_variant %}
+                      {{ card.cta_label }}
+                    {% endcomponent %}
+                  </div>
+                {% endif %}
+              {% empty %}
+              {% endfor %}
+            {% endwith %}
+          </div>
+        </div>
+      </div>
+    {% endcomponent %}
+
+    <div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
+      {% component "unfold/components/card.html" with title=start_title %}
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {% for card in workflow_stage_cards %}
+            <div class="rounded-default border p-4 {{ card.card_class }}">
+              <div class="flex h-full flex-col gap-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex items-center gap-3">
+                    <div class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-base-100 text-base-700 dark:bg-base-800 dark:text-base-100">
+                      <span class="material-symbols-outlined">{{ card.icon }}</span>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                      {% component "unfold/components/text.html" with class="text-[11px] font-medium uppercase tracking-[0.16em] text-base-500" %}
+                        {{ card.step }}
+                      {% endcomponent %}
+                      {% component "unfold/components/title.html" with class="text-xl leading-tight" %}
+                        {{ card.title }}
+                      {% endcomponent %}
+                    </div>
+                  </div>
+                  <span class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide {{ card.badge_class }}">{{ card.badge }}</span>
+                </div>
+
+                {% component "unfold/components/text.html" with class="text-sm text-base-600 dark:text-base-300" %}
+                  {{ card.description }}
+                {% endcomponent %}
+
+                <div class="rounded-default border px-4 py-3 {{ card.panel_class }}">
+                  {% component "unfold/components/text.html" with class="text-sm text-base-700 dark:text-base-200" %}
+                    {{ card.helper }}
+                  {% endcomponent %}
+                </div>
+
+                <div class="mt-auto flex items-center justify-between gap-3">
+                  {% component "unfold/components/text.html" with class="text-xs font-medium uppercase tracking-wide text-base-500" %}
+                    {% if card.is_featured %}
+                      {% trans "Accion principal" %}
+                    {% else %}
+                      {% trans "Etapa del flujo" %}
+                    {% endif %}
+                  {% endcomponent %}
+                  {% component "unfold/components/button.html" with href=card.link variant=card.cta_variant %}
+                    {{ card.cta_label }}
+                  {% endcomponent %}
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endcomponent %}
+
+      <div class="flex flex-col gap-4">
+        {% component "unfold/components/card.html" with title=resume_title %}
+        <div class="flex flex-col gap-3">
+          {% if workflow_has_cases %}
+            {% for case in workflow_resume_cases %}
+              <a href="{{ case.case_url }}" class="rounded-default border border-base-200 px-4 py-4 transition hover:border-primary-300 hover:bg-base-50 dark:border-base-800 dark:hover:border-primary-700 dark:hover:bg-base-950/40">
+                <div class="flex flex-col gap-3">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="flex flex-col gap-1">
+                      {% component "unfold/components/title.html" with class="text-lg leading-tight" %}
+                        {{ case.case_reference }}
+                      {% endcomponent %}
+                      {% component "unfold/components/text.html" with class="text-sm text-base-600 dark:text-base-300" %}
+                        {{ case.status_label }} · {{ case.current_stage.title }}
+                      {% endcomponent %}
+                    </div>
+                    {% component "unfold/components/text.html" with class="text-xs font-medium uppercase tracking-wide text-primary-600 dark:text-primary-300" %}
+                      {{ case.completion_ratio }}% completo
+                    {% endcomponent %}
+                  </div>
+
+                  <div class="h-2 overflow-hidden rounded-full bg-base-200 dark:bg-base-800">
+                    <div class="h-full rounded-full bg-primary-500" style="width: {{ case.completion_ratio }}%;"></div>
+                  </div>
+
+                  <div class="rounded-default border border-base-200 bg-base-50 px-4 py-3 dark:border-base-800 dark:bg-base-950/40">
+                    {% component "unfold/components/text.html" with class="text-sm text-base-700 dark:text-base-300" %}
+                      {% trans "Siguiente paso:" %} {{ case.next_stage.title }}. {% if case.action_items %}{{ case.action_items.0.message }}{% else %}{{ case.next_stage.description }}{% endif %}
+                    {% endcomponent %}
+                  </div>
+                </div>
+              </a>
+            {% endfor %}
+          {% else %}
+            <div class="rounded-default border border-dashed border-base-300 px-4 py-5 dark:border-base-700">
+              {% component "unfold/components/text.html" with class="text-sm text-base-700 dark:text-base-300" %}
+                {% trans "Todavia no hay pericias activas para retomar. Inicia un caso nuevo desde el primer paso del flujo." %}
+              {% endcomponent %}
+            </div>
+          {% endif %}
+        </div>
+        {% endcomponent %}
+
+        {% component "unfold/components/card.html" with title=guided_title %}
+          <div class="flex flex-col gap-3">
+            {% for item in workflow_checklist %}
+              <div class="rounded-default border border-base-200 px-4 py-3 dark:border-base-800">
+                {% component "unfold/components/text.html" with class="text-sm text-base-700 dark:text-base-300" %}
+                  <span class="mr-2 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary-100 px-2 text-xs font-semibold text-primary-700 dark:bg-primary-900 dark:text-primary-200">{{ forloop.counter }}</span>{{ item }}
+                {% endcomponent %}
+              </div>
+            {% endfor %}
+          </div>
+        {% endcomponent %}
+      </div>
+    </div>
+
+    {% component "unfold/components/card.html" with title=dependency_title %}
+      <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        <div class="rounded-default border border-base-200 px-4 py-3 dark:border-base-800">
+          {% component "unfold/components/text.html" with class="text-sm text-base-700 dark:text-base-300" %}
+            {% trans "Los planes de analisis dependen de dos cosas previas: puntos solicitados en el caso y puntos de pericia reutilizables en el catalogo." %}
+          {% endcomponent %}
+        </div>
+        <div class="rounded-default border border-base-200 px-4 py-3 dark:border-base-800">
+          {% component "unfold/components/text.html" with class="text-sm text-base-700 dark:text-base-300" %}
+            {% trans "Las respuestas por punto y las secciones del informe pueden completarse de manera incremental a medida que aparecen hallazgos y artefactos preservados." %}
+          {% endcomponent %}
+        </div>
+      </div>
+    {% endcomponent %}
+  </div>
+{% endcomponent %}
+{% endblock %}

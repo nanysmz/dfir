@@ -11,7 +11,11 @@ requires-python = ">=3.14,<3.15"
 dependencies = [
     "Django==6.0.4",
     "celery==5.6.3",
+    "django-unfold==0.81.0",
+    "Pillow==11.3.0",
+    "PyPDF2==3.0.1",
     "psycopg[binary]==3.3.3",
+    "python-docx==1.2.0",
     "redis==7.4.0",
 ]
 
