@@ -31,7 +31,7 @@ mas evidente, mas escaneable y mas consistente con la promesa de flujo guiado.
 
 ## Impact
 
-- Afecta [templates/admin/index.html](/Users/sandrazilla/dfir/templates/admin/index.html:1)
-- Afecta el contexto expuesto desde [src/dfir_core/admin.py](/Users/sandrazilla/dfir/src/dfir_core/admin.py:1)
-- Puede requerir pequeños ajustes en [src/dfir_pericia/workflow.py](/Users/sandrazilla/dfir/src/dfir_pericia/workflow.py:1)
+- Afecta `templates/admin/index.html`
+- Afecta el contexto expuesto desde `src/dfir_core/admin.py`
+- Puede requerir pequeños ajustes en `src/dfir_pericia/workflow.py`
 - Impacta tests de admin y documentacion operativa del backoffice
