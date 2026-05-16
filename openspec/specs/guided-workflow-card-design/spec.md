@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+Definir la estructura visual y de contenido de las tarjetas guiadas del inicio
+del admin para que el workflow pericial sea legible y accionable.
+
+## Requirements
 
 ### Requirement: Guided workflow cards expose structured stage information
 The system SHALL render each home-stage card with a stable information

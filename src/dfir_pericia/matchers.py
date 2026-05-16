@@ -6,6 +6,7 @@ from .extractors import ExtractionResult, NormalizedImageContent, NormalizedText
 from .models import PericiaPoint
 
 EMAIL_PATTERN = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.IGNORECASE)
+FINDING_LINE_WINDOW = 10
 
 
 def match_pericia_point(
@@ -195,16 +196,75 @@ def _text_finding(
     text: str,
     metadata: dict,
 ) -> dict:
-    window_start = max(0, start - 60)
-    window_end = min(len(text), end + 60)
-    context = text[window_start:window_end].strip()
+    line_fragment = _build_line_fragment(text, start, end, window=FINDING_LINE_WINDOW)
+    context = "\n".join(
+        str(line.get("text") or "")
+        for line in line_fragment.get("lines", [])
+        if str(line.get("text") or "").strip()
+    ).strip()
     return {
         "matched_value": matched_value,
         "context": context,
         "confidence": None,
-        "source_locator": {"start": start, "end": end},
+        "source_locator": {
+            "start": start,
+            "end": end,
+            "line_fragment": line_fragment,
+        },
         "extraction_metadata": metadata,
         "engine_metadata": {"engine": "normalized-text-matcher"},
+    }
+
+
+def _build_line_fragment(
+    text: str,
+    start: int,
+    end: int,
+    *,
+    window: int,
+) -> dict:
+    raw_lines = text.splitlines(keepends=True) or [text]
+    line_entries: list[dict[str, object]] = []
+    offset = 0
+    matched_line_index = 0
+    matched_line_found = False
+
+    for index, raw_line in enumerate(raw_lines):
+        line = raw_line.rstrip("\r\n")
+        line_start = offset
+        line_end = line_start + len(line)
+        raw_line_end = line_start + len(raw_line)
+        if not matched_line_found and (
+            line_start <= start < raw_line_end
+            or (index == len(raw_lines) - 1 and start >= line_start)
+        ):
+            matched_line_index = index
+            matched_line_found = True
+        line_entries.append(
+            {
+                "line_number": index + 1,
+                "text": line,
+                "is_match": False,
+                "line_start": line_start,
+                "line_end": line_end,
+            }
+        )
+        offset = raw_line_end
+
+    window_start = max(0, matched_line_index - window)
+    window_end = min(len(line_entries), matched_line_index + window + 1)
+    fragment_lines: list[dict[str, object]] = []
+    for index in range(window_start, window_end):
+        line_entry = dict(line_entries[index])
+        if index == matched_line_index:
+            line_entry["is_match"] = True
+        fragment_lines.append(line_entry)
+
+    return {
+        "window": window,
+        "matched_line_number": matched_line_index + 1,
+        "matched_line_index": matched_line_index - window_start,
+        "lines": fragment_lines,
     }
 
 

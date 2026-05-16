@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+Definir el runtime dockerizado del sistema, su orquestación y el contrato
+operativo para mounts, servicios y configuración local.
+
+## Requirements
 
 ### Requirement: Dockerized service composition
 The system SHALL define a Docker Compose runtime containing Django web, Celery worker, Redis, and Postgres services.

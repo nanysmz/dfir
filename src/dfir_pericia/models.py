@@ -1214,6 +1214,36 @@ class PericiaFinding(models.Model):
     def __str__(self) -> str:
         return f"{self.pericia_point.name}: {self.matched_value}"
 
+    @property
+    def line_fragment(self) -> dict:
+        source_locator = self.source_locator if isinstance(self.source_locator, dict) else {}
+        fragment = source_locator.get("line_fragment")
+        if isinstance(fragment, dict):
+            return fragment
+        return {}
+
+    @property
+    def contextual_fragment(self) -> dict:
+        fragment = self.line_fragment
+        if fragment:
+            return fragment
+        context = str(self.context or "").strip()
+        if not context:
+            return {}
+        return {
+            "window": 0,
+            "matched_line_number": None,
+            "matched_line_index": 0,
+            "lines": [
+                {
+                    "line_number": 1,
+                    "text": line,
+                    "is_match": index == 0,
+                }
+                for index, line in enumerate(context.splitlines() or [context])
+            ],
+        }
+
 
 class PreservedArtifact(models.Model):
     class ArtifactKind(models.TextChoices):

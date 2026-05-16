@@ -70,6 +70,8 @@ def test_execution_records_success_unsupported_and_failed_files(tmp_path):
     assert finding.matched_value == "transferencia"
     assert "analyst@example.com" in finding.context
     assert finding.source_locator["start"] >= 0
+    assert finding.contextual_fragment["matched_line_number"] == 1
+    assert finding.contextual_fragment["lines"][0]["is_match"] is True
 
 
 @pytest.mark.django_db
@@ -190,6 +192,8 @@ def test_execute_pericia_point_expands_directory_and_exports_matches(tmp_path, s
     assert payload["device_label"] == "Dispositivo 3"
     assert payload["source"]["full_path"].endswith(("chat.txt", "historial.html"))
     assert "filesystem_dates" in payload["source"]["extraction_metadata"]
+    assert payload["contextual_fragment"]["lines"]
+    assert any(line["is_match"] for line in payload["contextual_fragment"]["lines"])
 
 
 @pytest.mark.django_db

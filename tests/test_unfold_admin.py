@@ -25,6 +25,7 @@ from dfir_pericia.models import (
     EvidenceItem,
     PericiaCase,
     PericiaExecution,
+    PericiaFinding,
     PericiaPoint,
     ReportSection,
     RequestedPoint,
@@ -682,6 +683,63 @@ def test_evidence_file_admin_surfaces_homonymous_records_across_cases(client):
     assert detail_response.status_code == 200
     assert "homonimos en otros contextos" in detail_body.lower()
     assert "CASE-EF-HOM-002 / scope pericial / /evidence/input/dispositivo1/report.html" in detail_body
+
+
+@pytest.mark.django_db
+def test_pericia_finding_admin_shows_highlighted_fragment(client):
+    user = User.objects.create_superuser(
+        username="admin_finding_fragment",
+        email="admin.finding.fragment@example.local",
+        password="secret",
+    )
+    client.force_login(user)
+    point = PericiaPoint.objects.create(
+        name="Buscar wallet admin",
+        point_family=PericiaPoint.PointFamily.TEXT_KEYWORD_SEARCH,
+        matching_mode=PericiaPoint.MatchingMode.ANY,
+        parameters={"terms": ["wallet"]},
+    )
+    evidence_file = EvidenceFile.objects.create(
+        source_path="/tmp/hallazgo.txt",
+        display_name="hallazgo.txt",
+        file_kind=EvidenceFile.FileKind.TEXT,
+    )
+    execution = PericiaExecution.objects.create(
+        pericia_point=point,
+        status=PericiaExecution.Status.COMPLETED,
+    )
+    finding = PericiaFinding.objects.create(
+        execution=execution,
+        pericia_point=point,
+        evidence_file=evidence_file,
+        matched_value="wallet",
+        context="linea previa\nlinea wallet\nlinea posterior",
+        source_locator={
+            "start": 12,
+            "end": 18,
+            "line_fragment": {
+                "matched_line_number": 2,
+                "matched_line_index": 1,
+                "window": 10,
+                "lines": [
+                    {"line_number": 1, "text": "linea previa", "is_match": False},
+                    {"line_number": 2, "text": "linea wallet", "is_match": True},
+                    {"line_number": 3, "text": "linea posterior", "is_match": False},
+                ],
+            },
+        },
+    )
+
+    response = client.get(
+        reverse("admin:dfir_pericia_periciafinding_change", args=[finding.pk])
+    )
+
+    body = response.content.decode()
+    assert response.status_code == 200
+    assert "fragmento contextual" in body.lower()
+    assert "linea previa" in body
+    assert "linea wallet" in body
+    assert "linea posterior" in body
 
 
 @pytest.mark.django_db

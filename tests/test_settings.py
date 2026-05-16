@@ -14,6 +14,7 @@ def test_settings_read_runtime_environment(monkeypatch):
     monkeypatch.setenv("CELERY_RESULT_BACKEND", "redis://broker:6379/4")
     monkeypatch.setenv("EVIDENCE_INPUT_PATH", "/custom/input")
     monkeypatch.setenv("EVIDENCE_OUTPUT_PATH", "/custom/output")
+    monkeypatch.setenv("DJANGO_DATA_UPLOAD_MAX_NUMBER_FIELDS", "25000")
 
     import dfir_app.settings as settings
 
@@ -28,6 +29,7 @@ def test_settings_read_runtime_environment(monkeypatch):
     assert settings.CELERY_RESULT_BACKEND == "redis://broker:6379/4"
     assert str(settings.EVIDENCE_INPUT_PATH) == "/custom/input"
     assert str(settings.EVIDENCE_OUTPUT_PATH) == "/custom/output"
+    assert settings.DATA_UPLOAD_MAX_NUMBER_FIELDS == 25000
 
 
 def test_settings_resolve_project_templates_dir():
@@ -38,3 +40,13 @@ def test_settings_resolve_project_templates_dir():
 
     assert template_dir.name == "templates"
     assert (template_dir / "admin" / "index.html").exists()
+
+
+def test_settings_use_higher_default_field_upload_limit(monkeypatch):
+    monkeypatch.delenv("DJANGO_DATA_UPLOAD_MAX_NUMBER_FIELDS", raising=False)
+
+    import dfir_app.settings as settings
+
+    settings = importlib.reload(settings)
+
+    assert settings.DATA_UPLOAD_MAX_NUMBER_FIELDS == 20000

@@ -29,20 +29,31 @@ The system SHALL store source documents related to the pericia, including the ju
 - **THEN** it distinguishes at least judicial request documents from technical report documents
 
 ### Requirement: Requested points
-The system SHALL model the requested points of the pericia separately from reusable analysis strategies.
+The system SHALL model the requested points of the pericia separately from
+reusable analysis strategies.
 
 #### Scenario: Capture literal requested point
 - **WHEN** an analyst records a point requested by the authority
-- **THEN** the system stores the literal text, order, and source document relationship for that requested point
+- **THEN** the system stores the literal text, order, and source document
+  relationship for that requested point
+- **AND** that point remains scoped to the current pericia case only
 
 #### Scenario: Track requested point status
 - **WHEN** analysis progresses for a requested point
-- **THEN** the system records whether that requested point is pending, in progress, answered, partially answered, or blocked by technical limitations
+- **THEN** the system records whether that requested point is pending, in
+  progress, answered, partially answered, or blocked by technical limitations
+
+#### Scenario: Requested point order is unique within one case
+- **WHEN** an operator records multiple requested points for the same pericia
+- **THEN** the system preserves a unique `order` sequence within that case
+- **AND** another pericia can reuse the same order values without conflict
 
 ### Requirement: Analysis planning
 The system SHALL support case-specific analysis planning that links requested
 points to operational analysis strategies, and it SHALL make those plans part
-of a guided sequence between evidence intake and report consolidation.
+of a guided sequence between evidence intake and report consolidation, and it
+SHALL explain the operator-facing place of planning within the broader analysis
+module.
 
 #### Scenario: Associate strategies to a requested point
 - **WHEN** an analyst prepares how to answer a requested point
@@ -60,9 +71,15 @@ of a guided sequence between evidence intake and report consolidation.
 - **WHEN** an operator edits or creates a plan for a given `Pericia case`
 - **THEN** the requested-point selector only offers points that belong to that same case
 
+#### Scenario: Workflow explains analysis stage order
+- **WHEN** an operator reaches the analysis stage from the case workflow
+- **THEN** the system can explain that the expected sequence is to define or reuse techniques, create the case plan, execute it, and then review results
+
 ### Requirement: Evidence organization
 The system SHALL organize evidence as part of the pericia and distinguish
-original evidence from preserved derived artifacts.
+original evidence from preserved derived artifacts, and it SHALL preserve
+enough structured device-source and device-description metadata to support the
+report's `elementos ofrecidos` section.
 
 #### Scenario: Register evidence item
 - **WHEN** an analyst associates a device, image, extraction, or other evidence source to a pericia
@@ -71,6 +88,11 @@ original evidence from preserved derived artifacts.
 #### Scenario: Register preserved derived artifact
 - **WHEN** the analyst preserves extracted files, screenshots, reports, or sampled content derived from the analysis
 - **THEN** the system stores those preserved outputs as artifacts linked to the originating evidence item and pericia
+
+#### Scenario: Device metadata can feed offered-elements narrative
+- **WHEN** an operator records or updates the technical metadata of a device
+- **THEN** the workflow keeps that metadata available in structured form for
+  reuse in the report's `elementos ofrecidos` section
 
 ### Requirement: Device-by-device analysis record
 The system SHALL store a technical analysis record for each relevant evidence item in the pericia.
@@ -110,11 +132,7 @@ The system SHALL store technical responses to requested points using evidence-ba
 - **THEN** the system can evaluate whether requested-point responses are still pending, partially complete, blocked, or sufficiently complete to continue
 
 ### Requirement: Report section composition
-The system SHALL represent the technical report as structured sections that
-combine stable templates and case-specific content, and it SHALL treat report
-assembly as a distinct guided stage of the pericia, and it SHALL initialize
-new pericias with a standard section structure based on the institutional
-report model.
+The system SHALL represent the technical report as structured sections that combine stable templates and case-specific content, and it SHALL treat report assembly as a distinct guided stage of the pericia.
 
 #### Scenario: Compose report sections
 - **WHEN** the analyst prepares the technical report
@@ -128,12 +146,11 @@ report model.
 - **WHEN** the workflow reaches report assembly
 - **THEN** the system can determine whether the minimum report structure exists to consider the pericia ready for final review or closure
 
-#### Scenario: New case starts with standard report structure
-- **WHEN** a new pericia case is created
-- **THEN** the report workflow starts with a predefined section structure that
-  includes `Objeto`, `Elementos ofrecidos`, `Herramientas`, `Metodología`,
-  `Información obtenida`, `Conclusiones`, `Evidencia`, and `Anexo`
-- **AND** the operator can complete each section with case-specific content
+#### Scenario: Offered elements can reuse device description inputs
+- **WHEN** the report workflow needs to draft the `elementos ofrecidos`
+  section
+- **THEN** the system can reuse the structured device description inputs stored
+  on each `EvidenceItem`
 
 ### Requirement: Report-ready evidence traceability
 The system SHALL preserve enough links between requested points, evidence, device-level analysis, findings, and preserved outputs to justify the final report.
@@ -219,3 +236,19 @@ requested points into the naming flow used when defining or refining a
 - **WHEN** an analyst defines a pericia-point strategy from within a case
 - **THEN** the system can present names derived from that case's requested
   points instead of unrelated global options
+
+### Requirement: Finding traceability includes readable contextual fragment
+The system SHALL preserve enough finding context to justify a report statement
+with a readable fragment, not only the matched value.
+
+#### Scenario: Exported finding includes structured fragment
+- **WHEN** the system exports or preserves a finding-derived artifact
+- **THEN** that output includes the matched value
+- **AND** it includes the structured contextual fragment when available
+
+#### Scenario: Report support can reference highlighted finding line
+- **WHEN** an analyst reviews a finding to support a requested-point response or
+  report section
+- **THEN** the system can identify not only the source file but also the
+  highlighted line and surrounding fragment that support the statement
+

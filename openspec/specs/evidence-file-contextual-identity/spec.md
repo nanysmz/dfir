@@ -1,4 +1,9 @@
-## ADDED Requirements
+## Purpose
+Definir reglas de identidad contextual para archivos y carpetas de evidencia,
+evitando que nombres iguales se interpreten como la misma evidencia sin
+señales verificables.
+
+## Requirements
 
 ### Requirement: Evidence file identity is not inferred from name alone
 The system SHALL NOT treat two evidence files or folders as the same evidence

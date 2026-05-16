@@ -10,7 +10,7 @@ class RequestedPointResponseAdmin(ModelAdmin):
     list_display = ("requested_point", "pericia_case", "status", "updated_at")
     list_filter = ("status",)
     search_fields = ("requested_point__literal_text", "pericia_case__case_reference")
-    filter_horizontal = (
+    autocomplete_fields = (
         "device_analysis_results",
         "executions",
         "findings",

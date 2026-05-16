@@ -370,6 +370,7 @@ def _export_finding_output(
         "finding_id": finding.pk,
         "matched_value": finding.matched_value,
         "context": finding.context,
+        "contextual_fragment": finding.contextual_fragment,
         "source_locator": finding.source_locator,
         "source": {
             "file_name": source_path.name,
@@ -402,6 +403,7 @@ def _export_finding_output(
                 "matched_value": finding.matched_value,
                 "source_path": evidence_file.source_path,
                 "file_kind": evidence_file.file_kind,
+                "contextual_fragment": finding.contextual_fragment,
             },
         )
 

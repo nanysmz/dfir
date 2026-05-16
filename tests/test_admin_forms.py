@@ -1405,6 +1405,7 @@ def test_evidence_file_form_accepts_file_from_mounted_root(settings, tmp_path):
 
     form = EvidenceFileAdminForm(
         data={
+            "identity_scope": EvidenceFile.IDENTITY_SCOPE_GLOBAL,
             "source_path": str(candidate),
             "display_name": "captura.txt",
             "file_kind": "text",
@@ -1430,6 +1431,7 @@ def test_evidence_file_form_accepts_directory_from_mounted_root(settings, tmp_pa
 
     form = EvidenceFileAdminForm(
         data={
+            "identity_scope": EvidenceFile.IDENTITY_SCOPE_GLOBAL,
             "source_path": str(candidate),
             "display_name": "extraccion_dispositivo",
             "file_kind": "unknown",
@@ -1455,6 +1457,7 @@ def test_evidence_file_form_accepts_file_outside_mounted_roots(settings, tmp_pat
 
     form = EvidenceFileAdminForm(
         data={
+            "identity_scope": EvidenceFile.IDENTITY_SCOPE_GLOBAL,
             "source_path": str(outside),
             "display_name": "outside.txt",
             "file_kind": "text",
@@ -1480,6 +1483,7 @@ def test_evidence_file_form_accepts_directory_outside_mounted_roots(settings, tm
 
     form = EvidenceFileAdminForm(
         data={
+            "identity_scope": EvidenceFile.IDENTITY_SCOPE_GLOBAL,
             "source_path": str(outside),
             "display_name": "outside_dir",
             "file_kind": "unknown",
@@ -1505,6 +1509,7 @@ def test_evidence_file_form_accepts_container_style_mounted_path(settings, tmp_p
 
     form = EvidenceFileAdminForm(
         data={
+            "identity_scope": EvidenceFile.IDENTITY_SCOPE_GLOBAL,
             "source_path": "/evidence/input/dispositivo1/ActividadReciente",
             "display_name": "ActividadReciente",
             "file_kind": "unknown",

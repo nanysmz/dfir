@@ -49,6 +49,70 @@ def test_text_and_html_files_are_normalized_before_matching(tmp_path):
     assert [finding["matched_value"] for finding in keyword_findings] == [
         "transferencia sospechosa"
     ]
+    email_fragment = email_findings[0]["source_locator"]["line_fragment"]
+    assert email_fragment["matched_line_number"] == 1
+    email_matched_line = email_fragment["lines"][email_fragment["matched_line_index"]]
+    assert email_matched_line["is_match"] is True
+    assert "analyst@example.com" in email_findings[0]["context"]
+
+
+@pytest.mark.django_db
+def test_text_findings_store_surrounding_lines_window(tmp_path):
+    text_path = tmp_path / "multiline.txt"
+    text_path.write_text(
+        "\n".join(
+            [
+                "linea 1",
+                "linea 2",
+                "linea 3",
+                "linea 4",
+                "hallazgo wallet aqui",
+                "linea 6",
+                "linea 7",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    point = PericiaPoint.objects.create(
+        name="Buscar wallet multilinea",
+        point_family=PericiaPoint.PointFamily.TEXT_KEYWORD_SEARCH,
+        matching_mode=PericiaPoint.MatchingMode.ANY,
+        parameters={"terms": ["wallet"]},
+    )
+
+    result = extract_evidence_content(ensure_evidence_file(text_path))
+    findings = match_pericia_point(point, result)
+
+    fragment = findings[0]["source_locator"]["line_fragment"]
+    assert fragment["matched_line_number"] == 5
+    matched_line = fragment["lines"][fragment["matched_line_index"]]
+    assert matched_line["text"] == "hallazgo wallet aqui"
+    assert fragment["lines"][0]["text"] == "linea 1"
+    assert fragment["lines"][-1]["text"] == "linea 7"
+
+
+@pytest.mark.django_db
+def test_text_findings_store_correct_line_for_crlf_text(tmp_path):
+    text_path = tmp_path / "windows-lines.txt"
+    text_path.write_text(
+        "linea previa\r\nlinea intermedia\r\nlinea wallet objetivo\r\n",
+        encoding="utf-8",
+    )
+    point = PericiaPoint.objects.create(
+        name="Buscar wallet CRLF",
+        point_family=PericiaPoint.PointFamily.TEXT_KEYWORD_SEARCH,
+        matching_mode=PericiaPoint.MatchingMode.ANY,
+        parameters={"terms": ["wallet"]},
+    )
+
+    result = extract_evidence_content(ensure_evidence_file(text_path))
+    findings = match_pericia_point(point, result)
+
+    fragment = findings[0]["source_locator"]["line_fragment"]
+    matched_line = fragment["lines"][fragment["matched_line_index"]]
+    assert fragment["matched_line_number"] == 3
+    assert matched_line["text"] == "linea wallet objetivo"
+    assert matched_line["is_match"] is True
 
 
 @pytest.mark.django_db
